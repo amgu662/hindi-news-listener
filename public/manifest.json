@@ -1,0 +1,16 @@
+{
+  "name": "Hindi News Listener",
+  "short_name": "Hindi News",
+  "description": "חדשות מהודו – קריאה בהינדית עם תרגום לעברית",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#FF9933",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
