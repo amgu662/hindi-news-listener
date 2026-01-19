@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hindi News Listener</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 16px; }
+    .top { display:flex; gap:12px; flex-wrap: wrap; align-items:center; justify-content: flex-start; }
+    .card { border:1px solid #ddd; border-radius: 10px; padding:12px; margin-top:12px; max-width: 980px; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content: flex-start; }
+    button { padding:8px 12px; border-radius:8px; border:1px solid #888; background:#fff; cursor:pointer; }
+    button:hover { background:#f3f3f3; }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    select, input { padding:6px 10px; border-radius:8px; border:1px solid #888; }
+    .small { color:#666; font-size: 12px; }
+
+    .card, .hi, .he, .statusLine { text-align: right; }
+
+    .title {
+      font-weight: 700;
+      font-size: 18px;
+      margin: 6px 0 10px;
+      direction: ltr;
+      text-align: right;
+      unicode-bidi: plaintext;
+    }
+
+    .hi { font-size: 20px; margin: 8px 0 2px; padding: 6px 8px; border-radius: 10px; line-height: 1.7; }
+    .he { color:#333; margin: 0 0 10px; padding: 0 8px 6px; }
+
+    .hi.activeSentence { background: #fff3c4; border: 1px solid #f1d16a; }
+
+    .word {
+      display: inline-block;
+      padding: 2px 6px;
+      margin: 2px 2px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .word:hover { background: #f0f0f0; }
+    .word.activeWord {
+      background: #cfe9ff;
+      outline: 1px solid #8ec5ff;
+    }
+
+    /* הינדית היא LTR אבל מיושרת לימין */
+    .hi, .word {
+      direction: ltr;
+      unicode-bidi: plaintext;
+      text-align: right;
+    }
+
+    .imgWrap { margin-top: 10px; text-align: right; }
+    .newsImg { width: 300px; max-width: 100%; border-radius: 10px; display: inline-block; }
+
+    .controlsBox{
+      border:1px dashed #ddd;
+      padding:10px;
+      border-radius:10px;
+      margin-top: 10px;
+      max-width: 980px;
+    }
+
+    .pill { border:1px solid #ddd; border-radius:999px; padding:6px 10px; }
+
+    /* Tooltip לתרגום מעל מילה */
+    #wordTip {
+      position: fixed;
+      display: none;
+      z-index: 9999;
+      background: #111;
+      color: #fff;
+      padding: 6px 10px;
+      border-radius: 10px;
+      font-size: 13px;
+      max-width: 260px;
+      box-shadow: 0 6px 18px rgba(0,0,0,.25);
+      transform: translate(-50%, -110%);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .currentWordLine {
+      margin-top: 8px;
+      padding: 10px;
+      border-radius: 10px;
+      background: #f7f7f7;
+      border: 1px solid #eee;
+      max-width: 980px;
+    }
+  </style>
+</head>
+
+<body>
+  <h2>Hindi News Listener (MVP)</h2>
+
+  <div class="top">
+    <label>כמות ידיעות:
+      <input id="count" type="number" min="1" max="10" value="2" />
+    </label>
+
+    <label>חיפוש (q):
+      <input id="q" type="text" value="India" />
+    </label>
+
+    <label>רמת הינדית:
+      <select id="level">
+        <option value="beginner">מתחילים</option>
+        <option value="intermediate">בינוניים</option>
+        <option value="advanced">מתקדמים</option>
+      </select>
+    </label>
+
+    <button id="load">Load news</button>
+    <span class="small" id="status"></span>
+  </div>
+
+  <div class="controlsBox">
+    <div class="row">
+      <label>קצב דיבור (%):
+        <input id="rate" type="range" min="60" max="140" value="100" />
+      </label>
+      <span class="small" id="rateVal">100%</span>
+
+      <label>פאוזה בין מילים:
+        <select id="pause">
+          <option value="0">0</option>
+          <option value="500">0.5 שנ׳</option>
+          <option value="1000">1 שנ׳</option>
+          <option value="1500">1.5 שנ׳</option>
+          <option value="2000">2 שנ׳</option>
+        </select>
+      </label>
+
+      <label>מצב מעבר משפטים:
+        <select id="mode">
+          <option value="auto">אוטומטי</option>
+          <option value="space">עם רווח (Space)</option>
+        </select>
+      </label>
+
+      <span class="pill small">במצב Space: רווח = משפט הבא | R = Repeat | ←/→ = Prev/Next</span>
+    </div>
+  </div>
+
+  <div class="currentWordLine small" id="currentWordLine">
+    מילה נוכחית: <b id="cw_hi">—</b> | תרגום: <b id="cw_he">—</b>
+  </div>
+
+  <div id="list"></div>
+
+  <div id="wordTip"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+let currentAudio = null;
+let activeSession = null;
+
+$("rate").addEventListener("input", () => {
+  $("rateVal").textContent = `${$("rate").value}%`;
+});
+
+function splitHindiHebrew(text) {
+  const lines = text.split("\n").map(s => s.trim()).filter(Boolean);
+  const pairs = [];
+  for (let i = 0; i < lines.length; i += 2) {
+    pairs.push({ hi: lines[i] ?? "", he: lines[i + 1] ?? "" });
+  }
+  return pairs;
+}
+
+async function apiGet(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+async function apiPostJson(url, body) {
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+async function apiPostAudio(url, body) {
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+
+  const ct = (r.headers.get("content-type") || "").toLowerCase();
+  if (!r.ok || ct.includes("application/json") || ct.includes("text/")) {
+    const txt = await r.text();
+    throw new Error(txt);
+  }
+
+  const buf = await r.arrayBuffer();
+  if (!buf || buf.byteLength < 150) throw new Error("Audio too small");
+  return buf;
+}
+
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+function stopAudio() {
+  if (currentAudio) {
+    try { currentAudio.pause(); } catch {}
+    currentAudio = null;
+  }
+  if (activeSession) activeSession.token++;
+}
+
+function clearSentenceHighlight(session) {
+  session.hiSentenceEls.forEach(el => el.classList.remove("activeSentence"));
+}
+function setSentenceHighlight(session, idx) {
+  clearSentenceHighlight(session);
+  const el = session.hiSentenceEls[idx];
+  if (el) el.classList.add("activeSentence");
+}
+
+function clearWordHighlight(session) {
+  const arr = session.wordSpanElsBySentence[session.idx] || [];
+  arr.forEach(s => s.classList.remove("activeWord"));
+}
+function setWordHighlight(session, wordIndex) {
+  const arr = session.wordSpanElsBySentence[session.idx] || [];
+  arr.forEach(s => s.classList.remove("activeWord"));
+  const el = arr[wordIndex];
+  if (el) el.classList.add("activeWord");
+  return el || null;
+}
+
+function showTipOver(el, text) {
+  const tip = $("wordTip");
+  if (!el) { tip.style.display = "none"; return; }
+  const r = el.getBoundingClientRect();
+  tip.textContent = text || "";
+  tip.style.left = `${r.left + r.width / 2}px`;
+  tip.style.top = `${r.top}px`;
+  tip.style.display = text ? "block" : "none";
+}
+
+function setCurrentWordLine(hi, he) {
+  $("cw_hi").textContent = hi || "—";
+  $("cw_he").textContent = he || "—";
+}
+
+async function ensureWordMap(session, sentenceIdx) {
+  if (session.wordMaps[sentenceIdx]) return session.wordMaps[sentenceIdx];
+  const sentence = session.sentences[sentenceIdx] || "";
+  const resp = await apiPostJson("/api/wordmap", { sentence });
+  const map = Array.isArray(resp.words) ? resp.words : [];
+  session.wordMaps[sentenceIdx] = map;
+  return map;
+}
+
+async function playWordDirect(wordText) {
+  const rate = Number($("rate").value || 100);
+  const audioBuf = await apiPostAudio("/api/speak", { text: wordText, rate, pauseMs: 0 });
+
+  const blob = new Blob([audioBuf], { type: "audio/mpeg" });
+  const url = URL.createObjectURL(blob);
+
+  currentAudio = new Audio(url);
+  await currentAudio.play();
+
+  await new Promise((resolve) => {
+    currentAudio.onended = () => {
+      URL.revokeObjectURL(url);
+      currentAudio = null;
+      resolve();
+    };
+  });
+}
+
+async function playSentenceWordByWord(session, sentenceIdx) {
+  session.idx = sentenceIdx;
+  setSentenceHighlight(session, sentenceIdx);
+
+  const tokenAtStart = session.token;
+
+  const pauseMs = Number($("pause").value || 0);
+  const words = session.wordsBySentence[sentenceIdx] || [];
+  if (!words.length) return;
+
+  const wordMap = await ensureWordMap(session, sentenceIdx);
+
+  for (let i = 0; i < words.length; i++) {
+    if (session.token !== tokenAtStart) return;
+
+    const w = words[i];
+    const he = (wordMap[i] && wordMap[i].he) ? wordMap[i].he : "";
+
+    const spanEl = setWordHighlight(session, i);
+    setCurrentWordLine(w, he);
+    showTipOver(spanEl, he);
+
+    await playWordDirect(w);
+
+    showTipOver(null, "");
+    if (pauseMs > 0) await sleep(pauseMs);
+  }
+
+  clearWordHighlight(session);
+  setCurrentWordLine("", "");
+}
+
+function nextSentence(session) {
+  const next = session.idx + 1;
+  if (next < session.sentences.length) {
+    playFlow(session, next).catch(e => alert("שגיאה: " + e.message));
+  } else {
+    clearSentenceHighlight(session);
+    setCurrentWordLine("", "");
+  }
+}
+function prevSentence(session) {
+  const prev = session.idx - 1;
+  if (prev >= 0) playFlow(session, prev).catch(e => alert("שגיאה: " + e.message));
+}
+function repeatSentence(session) {
+  playFlow(session, session.idx).catch(e => alert("שגיאה: " + e.message));
+}
+
+async function playFlow(session, startIdx) {
+  const mode = $("mode").value;
+
+  if (mode === "auto") {
+    for (let s = startIdx; s < session.sentences.length; s++) {
+      const token = session.token;
+      await playSentenceWordByWord(session, s);
+      if (session.token !== token) return;
+    }
+    clearSentenceHighlight(session);
+  } else {
+    await playSentenceWordByWord(session, startIdx);
+  }
+}
+
+/* מקשי קיצור */
+document.addEventListener("keydown", (ev) => {
+  const tag = (ev.target && ev.target.tagName || "").toLowerCase();
+  if (tag === "input" || tag === "textarea" || tag === "select") return;
+
+  if (!activeSession) return;
+
+  if ($("mode").value === "space") {
+    if (ev.code === "Space") {
+      ev.preventDefault();
+      nextSentence(activeSession);
+    }
+    if (ev.key === "r" || ev.key === "R") {
+      ev.preventDefault();
+      repeatSentence(activeSession);
+    }
+    if (ev.key === "ArrowRight") {
+      ev.preventDefault();
+      nextSentence(activeSession);
+    }
+    if (ev.key === "ArrowLeft") {
+      ev.preventDefault();
+      prevSentence(activeSession);
+    }
+  }
+});
+
+async function summarizeInto(outEl, article, level) {
+  outEl.innerHTML = `<div class="statusLine small">מסכם…</div>`;
+
+  const raw = `${article.title || ""}\n\n${article.description || ""}\n\n${article.content || ""}`.trim();
+  const s = await apiPostJson("/api/summarize", { text: raw, level });
+
+  const pairs = splitHindiHebrew(s.result);
+  const sentences = pairs.map(p => p.hi).filter(Boolean);
+
+  outEl.innerHTML = "";
+  const hiSentenceEls = [];
+  const wordSpanElsBySentence = [];
+  const wordsBySentence = [];
+
+  for (let si = 0; si < pairs.length; si++) {
+    const p = pairs[si];
+
+    const hi = document.createElement("div");
+    hi.className = "hi";
+
+    const words = String(p.hi || "").trim().split(/\s+/).filter(Boolean);
+    wordsBySentence.push(words);
+
+    const spans = [];
+    for (const w of words) {
+      const sp = document.createElement("span");
+      sp.className = "word";
+      sp.textContent = w;
+      sp.title = "לחץ כדי לשמוע את המילה";
+
+      sp.addEventListener("click", async () => {
+        try {
+          stopAudio();
+
+          // ניסיון להביא תרגום למילה לפי ה-session הפעיל והמשפט הנוכחי
+          let he = "";
+          if (activeSession) {
+            const map = await ensureWordMap(activeSession, activeSession.idx);
+            const arr = activeSession.wordSpanElsBySentence[activeSession.idx] || [];
+            const idx = arr.indexOf(sp);
+            if (idx >= 0 && map[idx] && map[idx].he) he = map[idx].he;
+          }
+
+          setCurrentWordLine(w, he);
+          showTipOver(sp, he);
+
+          await playWordDirect(w);
+
+          showTipOver(null, "");
+        } catch (e) {
+          alert("שגיאה: " + e.message);
+        }
+      });
+
+      hi.appendChild(sp);
+      spans.push(sp);
+
+      hi.appendChild(document.createTextNode(" "));
+    }
+
+    wordSpanElsBySentence.push(spans);
+    hiSentenceEls.push(hi);
+
+    const he = document.createElement("div");
+    he.className = "he";
+    he.textContent = p.he;
+
+    outEl.appendChild(hi);
+    outEl.appendChild(he);
+  }
+
+  return { sentences, hiSentenceEls, wordSpanElsBySentence, wordsBySentence };
+}
+
+async function loadNews() {
+  $("status").textContent = "טוען חדשות...";
+  $("list").innerHTML = "";
+  activeSession = null;
+  stopAudio();
+
+  const count = Number($("count").value || 2);
+  const q = $("q").value || "India";
+  const level = $("level").value;
+
+  const news = await apiGet(`/api/news?count=${encodeURIComponent(count)}&q=${encodeURIComponent(q)}`);
+  $("status").textContent = `מציג ${news.articles.length} (מתוך ${news.totalResults}).`;
+
+  for (const a of news.articles) {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const title = document.createElement("div");
+    title.className = "title";
+    title.textContent = a.title || "(no title)";
+
+    const controls = document.createElement("div");
+    controls.className = "row";
+
+    const readBtn = document.createElement("button");
+    readBtn.textContent = "READ";
+    controls.appendChild(readBtn);
+
+    const prevBtn = document.createElement("button");
+    prevBtn.textContent = "PREV";
+    controls.appendChild(prevBtn);
+
+    const nextBtn = document.createElement("button");
+    nextBtn.textContent = "NEXT";
+    controls.appendChild(nextBtn);
+
+    const repeatBtn = document.createElement("button");
+    repeatBtn.textContent = "REPEAT";
+    controls.appendChild(repeatBtn);
+
+    const stopBtn = document.createElement("button");
+    stopBtn.textContent = "STOP";
+    controls.appendChild(stopBtn);
+
+    const info = document.createElement("span");
+    info.className = "small";
+    info.textContent = "";
+    controls.appendChild(info);
+
+    const out = document.createElement("div");
+
+    const imgWrap = document.createElement("div");
+    imgWrap.className = "imgWrap";
+    const img = document.createElement("img");
+    img.className = "newsImg";
+    img.src = a.urlToImage || "";
+    img.alt = "news image";
+    if (!a.urlToImage) img.style.display = "none";
+    imgWrap.appendChild(img);
+
+    card.appendChild(title);
+    card.appendChild(controls);
+    card.appendChild(out);
+    card.appendChild(imgWrap);
+    $("list").appendChild(card);
+
+    let summaryData = null;
+
+    summarizeInto(out, a, level)
+      .then(d => {
+        summaryData = d;
+        info.textContent = `(${d.sentences.length} משפטים)`;
+      })
+      .catch(e => {
+        out.innerHTML = `<div class="small">שגיאה בסיכום: ${e.message}</div>`;
+      });
+
+    stopBtn.onclick = () => {
+      stopAudio();
+
+      if (activeSession && activeSession.readBtnEl) {
+        activeSession.readBtnEl.disabled = false;
+        activeSession.readBtnEl.textContent = "READ";
+      }
+
+      activeSession = null;
+      $("wordTip").style.display = "none";
+      setCurrentWordLine("", "");
+    };
+
+    nextBtn.onclick = () => {
+      if (!activeSession || activeSession.outEl !== out) {
+        alert("הפעל READ קודם כדי להתחיל.");
+        return;
+      }
+      nextSentence(activeSession);
+    };
+
+    prevBtn.onclick = () => {
+      if (!activeSession || activeSession.outEl !== out) {
+        alert("הפעל READ קודם כדי להתחיל.");
+        return;
+      }
+      prevSentence(activeSession);
+    };
+
+    repeatBtn.onclick = () => {
+      if (!activeSession || activeSession.outEl !== out) {
+        alert("הפעל READ קודם כדי להתחיל.");
+        return;
+      }
+      repeatSentence(activeSession);
+    };
+
+    readBtn.onclick = async () => {
+      try {
+        if (!summaryData) {
+          alert("הסיכום עדיין נטען… נסה שוב בעוד רגע.");
+          return;
+        }
+        if (!summaryData.sentences.length) {
+          alert("אין משפטים להקראה.");
+          return;
+        }
+
+        stopAudio();
+
+        const session = {
+          outEl: out,
+          readBtnEl: readBtn,
+          sentences: summaryData.sentences,
+          hiSentenceEls: summaryData.hiSentenceEls,
+          wordSpanElsBySentence: summaryData.wordSpanElsBySentence,
+          wordsBySentence: summaryData.wordsBySentence,
+          wordMaps: {},
+          idx: 0,
+          token: 0
+        };
+        activeSession = session;
+
+        readBtn.disabled = true;
+        readBtn.textContent = "READING...";
+
+        await playFlow(session, 0);
+
+      } catch (e) {
+        alert("שגיאה: " + e.message);
+      } finally {
+        if (readBtn === (activeSession && activeSession.readBtnEl)) {
+          readBtn.disabled = false;
+          readBtn.textContent = "READ";
+        } else {
+          // אם כבר החליפו session בינתיים – עדיין נוודא שהכפתור חוזר
+          readBtn.disabled = false;
+          readBtn.textContent = "READ";
+        }
+      }
+    };
+  }
+}
+
+$("load").onclick = () => loadNews().catch(e => {
+  $("status").textContent = "שגיאה: " + e.message;
+});
+</script>
+</body>
+</html>
