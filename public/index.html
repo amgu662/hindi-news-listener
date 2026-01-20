@@ -1,75 +1,169 @@
 <!doctype html>
 <html lang="he" dir="rtl">
 <head>
-  <link rel="manifest" href="/manifest.json">
-<link rel="icon" href="/icon-512.png">
-<meta name="theme-color" content="#FF9933">
-
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Hindi News Listener</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icon-512.png">
+  <meta name="theme-color" content="#FF9933">
+
   <style>
-    body { font-family: Arial, sans-serif; margin: 16px; }
-    .top { display:flex; gap:12px; flex-wrap: wrap; align-items:center; justify-content: flex-start; }
-    .card { border:1px solid #ddd; border-radius: 10px; padding:12px; margin-top:12px; max-width: 980px; }
-    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content: flex-start; }
-    button { padding:8px 12px; border-radius:8px; border:1px solid #888; background:#fff; cursor:pointer; }
-    button:hover { background:#f3f3f3; }
-    button:disabled { opacity: .55; cursor: not-allowed; }
-    select, input { padding:6px 10px; border-radius:8px; border:1px solid #888; }
-    .small { color:#666; font-size: 12px; }
+    :root{
+      --saffron:#FF9933;
+      --green:#138808;
+      --chakra:#000080;
+      --ink:#111;
+      --muted:#666;
+      --card:#fff;
+      --bg1:rgba(255,153,51,0.10);
+      --bg2:rgba(255,255,255,0.35);
+      --bg3:rgba(19,136,8,0.10);
+    }
+    *{ box-sizing:border-box; }
+    body{
+      font-family: Arial, sans-serif;
+      margin: 0;
+      color: var(--ink);
+      background: linear-gradient(180deg, var(--bg1), var(--bg2), var(--bg3));
+      min-height: 100vh;
+    }
+    header{
+      padding: 14px 16px;
+      background: #fff;
+      border-top: 6px solid var(--saffron);
+      border-bottom: 6px solid var(--green);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    header h2{
+      margin: 0;
+      font-size: 18px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      text-align:right;
+    }
+    .badge{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      border: 1px solid #eee;
+      background: #fafafa;
+      color: var(--chakra);
+    }
+    main{ padding: 16px; }
+    .top{ display:flex; gap:12px; flex-wrap: wrap; align-items:center; justify-content: flex-start; }
 
-    .card, .hi, .he, .statusLine { text-align: right; }
+    .controlsBox{
+      border:1px dashed #ddd;
+      padding:10px;
+      border-radius:12px;
+      margin-top: 10px;
+      max-width: 980px;
+      background: rgba(255,255,255,0.7);
+      backdrop-filter: blur(4px);
+    }
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content: flex-start; }
 
-    .title {
+    .card{
+      border:1px solid #e6e6e6;
+      border-radius: 14px;
+      padding: 12px;
+      margin-top: 12px;
+      max-width: 980px;
+      background: var(--card);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+      text-align:right;
+    }
+
+    /* NEXT/PREV בשורה נפרדת */
+    .navRow{
+      margin-top: 10px;
+      display:flex;
+      gap:10px;
+      justify-content:center;
+      flex-wrap:wrap;
+    }
+
+    button{
+      padding:8px 12px;
+      border-radius:10px;
+      border:1px solid #cfcfcf;
+      background:#fff;
+      cursor:pointer;
+      transition: transform .03s ease, background .12s ease;
+    }
+    button:hover{ background:#f5f5f5; }
+    button:active{ transform: translateY(1px); }
+    button:disabled{ opacity: .55; cursor: not-allowed; }
+
+    button.primary{
+      background: var(--chakra);
+      color:#fff;
+      border-color: var(--chakra);
+    }
+    button.danger{
+      background:#b00020;
+      color:#fff;
+      border-color:#b00020;
+    }
+
+    select, input{ padding:6px 10px; border-radius:10px; border:1px solid #cfcfcf; }
+    .small{ color: var(--muted); font-size: 12px; }
+
+    .title{
       font-weight: 700;
       font-size: 18px;
       margin: 6px 0 10px;
-      direction: ltr;
-      text-align: right;
+      direction: ltr;       /* אנגלית LTR */
+      text-align: right;    /* אבל מיושר לימין */
       unicode-bidi: plaintext;
     }
 
-    .hi { font-size: 20px; margin: 8px 0 2px; padding: 6px 8px; border-radius: 10px; line-height: 1.7; }
-    .he { color:#333; margin: 0 0 10px; padding: 0 8px 6px; }
+    /* הינדית היא LTR אבל מיושרת לימין */
+    .hi, .word{
+      direction: ltr;
+      unicode-bidi: plaintext;
+      text-align: right;
+    }
+    .hi{
+      font-size: 20px;
+      margin: 8px 0 2px;
+      padding: 6px 8px;
+      border-radius: 12px;
+      line-height: 1.7;
+    }
+    .he{ color:#333; margin: 0 0 10px; padding: 0 8px 6px; }
 
-    .hi.activeSentence { background: #fff3c4; border: 1px solid #f1d16a; }
+    .hi.activeSentence{ background: #fff3c4; border: 1px solid #f1d16a; }
 
-    .word {
+    .word{
       display: inline-block;
       padding: 2px 6px;
       margin: 2px 2px;
       border-radius: 10px;
       cursor: pointer;
     }
-    .word:hover { background: #f0f0f0; }
-    .word.activeWord {
+    .word:hover{ background: #f0f0f0; }
+    .word.activeWord{
       background: #cfe9ff;
       outline: 1px solid #8ec5ff;
     }
 
-    /* הינדית היא LTR אבל מיושרת לימין */
-    .hi, .word {
-      direction: ltr;
-      unicode-bidi: plaintext;
-      text-align: right;
-    }
+    .imgWrap{ margin-top: 10px; text-align: right; }
+    .newsImg{ width: 260px; max-width: 100%; border-radius: 12px; display: inline-block; border:1px solid #eee; }
 
-    .imgWrap { margin-top: 10px; text-align: right; }
-    .newsImg { width: 300px; max-width: 100%; border-radius: 10px; display: inline-block; }
-
-    .controlsBox{
-      border:1px dashed #ddd;
-      padding:10px;
-      border-radius:10px;
-      margin-top: 10px;
-      max-width: 980px;
-    }
-
-    .pill { border:1px solid #ddd; border-radius:999px; padding:6px 10px; }
+    .pill{ border:1px solid #e9e9e9; border-radius:999px; padding:6px 10px; background:#fff; }
 
     /* Tooltip לתרגום מעל מילה */
-    #wordTip {
+    #wordTip{
       position: fixed;
       display: none;
       z-index: 9999;
@@ -85,76 +179,90 @@
       white-space: nowrap;
     }
 
-    .currentWordLine {
+    .currentWordLine{
       margin-top: 8px;
       padding: 10px;
-      border-radius: 10px;
-      background: #f7f7f7;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.85);
       border: 1px solid #eee;
       max-width: 980px;
+      text-align:right;
+    }
+
+    .hr{
+      height:1px;
+      background: linear-gradient(90deg, var(--saffron), #fff, var(--green));
+      border:0;
+      margin: 10px 0;
     }
   </style>
 </head>
 
 <body>
-  <h2>Hindi News Listener (MVP)</h2>
+  <header>
+    <h2>
+      Hindi News Listener
+      <span class="badge">🇮🇳 भारत</span>
+    </h2>
+  </header>
 
-  <div class="top">
-    <label>כמות ידיעות:
-      <input id="count" type="number" min="1" max="10" value="2" />
-    </label>
-
-    <label>חיפוש (q):
-      <input id="q" type="text" value="India" />
-    </label>
-
-    <label>רמת הינדית:
-      <select id="level">
-        <option value="beginner">מתחילים</option>
-        <option value="intermediate">בינוניים</option>
-        <option value="advanced">מתקדמים</option>
-      </select>
-    </label>
-
-    <button id="load">Load news</button>
-    <span class="small" id="status"></span>
-  </div>
-
-  <div class="controlsBox">
-    <div class="row">
-      <label>קצב דיבור (%):
-        <input id="rate" type="range" min="60" max="140" value="100" />
+  <main>
+    <div class="top">
+      <label>כמות ידיעות:
+        <input id="count" type="number" min="1" max="10" value="2" />
       </label>
-      <span class="small" id="rateVal">100%</span>
 
-      <label>פאוזה בין מילים:
-        <select id="pause">
-          <option value="0">0</option>
-          <option value="500">0.5 שנ׳</option>
-          <option value="1000">1 שנ׳</option>
-          <option value="1500">1.5 שנ׳</option>
-          <option value="2000">2 שנ׳</option>
+      <label>חיפוש (q):
+        <input id="q" type="text" value="India" />
+      </label>
+
+      <label>רמת הינדית:
+        <select id="level">
+          <option value="beginner">מתחילים</option>
+          <option value="intermediate">בינוניים</option>
+          <option value="advanced">מתקדמים</option>
         </select>
       </label>
 
-      <label>מצב מעבר משפטים:
-        <select id="mode">
-          <option value="auto">אוטומטי</option>
-          <option value="space">עם רווח (Space)</option>
-        </select>
-      </label>
-
-      <span class="pill small">במצב Space: רווח = משפט הבא | R = Repeat | ←/→ = Prev/Next</span>
+      <button id="load" class="primary">Load news</button>
+      <span class="small" id="status"></span>
     </div>
-  </div>
 
-  <div class="currentWordLine small" id="currentWordLine">
-    מילה נוכחית: <b id="cw_hi">—</b> | תרגום: <b id="cw_he">—</b>
-  </div>
+    <div class="controlsBox">
+      <div class="row">
+        <label>קצב דיבור (%):
+          <input id="rate" type="range" min="60" max="140" value="100" />
+        </label>
+        <span class="small" id="rateVal">100%</span>
 
-  <div id="list"></div>
+        <label>פאוזה בין מילים:
+          <select id="pause">
+            <option value="0">0</option>
+            <option value="500">0.5 שנ׳</option>
+            <option value="1000">1 שנ׳</option>
+            <option value="1500">1.5 שנ׳</option>
+            <option value="2000">2 שנ׳</option>
+          </select>
+        </label>
 
-  <div id="wordTip"></div>
+        <label>מצב מעבר משפטים:
+          <select id="mode">
+            <option value="auto">אוטומטי</option>
+            <option value="space">עם רווח (Space)</option>
+          </select>
+        </label>
+
+        <span class="pill small">במצב Space: רווח = משפט הבא | R = Repeat | ←/→ = Prev/Next</span>
+      </div>
+    </div>
+
+    <div class="currentWordLine small" id="currentWordLine">
+      מילה נוכחית: <b id="cw_hi">—</b> | תרגום: <b id="cw_he">—</b>
+    </div>
+
+    <div id="list"></div>
+    <div id="wordTip"></div>
+  </main>
 
 <script>
 const $ = (id) => document.getElementById(id);
@@ -224,6 +332,7 @@ function stopAudio() {
 function clearSentenceHighlight(session) {
   session.hiSentenceEls.forEach(el => el.classList.remove("activeSentence"));
 }
+
 function setSentenceHighlight(session, idx) {
   clearSentenceHighlight(session);
   const el = session.hiSentenceEls[idx];
@@ -234,6 +343,7 @@ function clearWordHighlight(session) {
   const arr = session.wordSpanElsBySentence[session.idx] || [];
   arr.forEach(s => s.classList.remove("activeWord"));
 }
+
 function setWordHighlight(session, wordIndex) {
   const arr = session.wordSpanElsBySentence[session.idx] || [];
   arr.forEach(s => s.classList.remove("activeWord"));
@@ -266,23 +376,41 @@ async function ensureWordMap(session, sentenceIdx) {
   return map;
 }
 
-async function playWordDirect(wordText) {
+// --- Prefetch to remove long gaps when pause=0 ---
+async function fetchWordAudioBlob(wordText) {
   const rate = Number($("rate").value || 100);
   const audioBuf = await apiPostAudio("/api/speak", { text: wordText, rate, pauseMs: 0 });
+  return new Blob([audioBuf], { type: "audio/mpeg" });
+}
 
-  const blob = new Blob([audioBuf], { type: "audio/mpeg" });
-  const url = URL.createObjectURL(blob);
+async function playBlob(blob) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const a = new Audio(url);
+    currentAudio = a;
 
-  currentAudio = new Audio(url);
-  await currentAudio.play();
-
-  await new Promise((resolve) => {
-    currentAudio.onended = () => {
+    a.onended = () => {
       URL.revokeObjectURL(url);
-      currentAudio = null;
+      if (currentAudio === a) currentAudio = null;
       resolve();
     };
+    a.onerror = () => {
+      URL.revokeObjectURL(url);
+      if (currentAudio === a) currentAudio = null;
+      reject(new Error("Audio play failed"));
+    };
+
+    a.play().catch(err => {
+      URL.revokeObjectURL(url);
+      if (currentAudio === a) currentAudio = null;
+      reject(err);
+    });
   });
+}
+
+async function playWord(session, wordText, prefetchedBlob) {
+  const blob = prefetchedBlob || await fetchWordAudioBlob(wordText);
+  await playBlob(blob);
 }
 
 async function playSentenceWordByWord(session, sentenceIdx) {
@@ -297,6 +425,9 @@ async function playSentenceWordByWord(session, sentenceIdx) {
 
   const wordMap = await ensureWordMap(session, sentenceIdx);
 
+  // prefetch first
+  let nextAudioPromise = fetchWordAudioBlob(words[0]);
+
   for (let i = 0; i < words.length; i++) {
     if (session.token !== tokenAtStart) return;
 
@@ -307,7 +438,12 @@ async function playSentenceWordByWord(session, sentenceIdx) {
     setCurrentWordLine(w, he);
     showTipOver(spanEl, he);
 
-    await playWordDirect(w);
+    const currentBlob = await nextAudioPromise;
+
+    const nextWord = words[i + 1];
+    nextAudioPromise = nextWord ? fetchWordAudioBlob(nextWord) : Promise.resolve(null);
+
+    await playWord(session, w, currentBlob);
 
     showTipOver(null, "");
     if (pauseMs > 0) await sleep(pauseMs);
@@ -326,10 +462,12 @@ function nextSentence(session) {
     setCurrentWordLine("", "");
   }
 }
+
 function prevSentence(session) {
   const prev = session.idx - 1;
   if (prev >= 0) playFlow(session, prev).catch(e => alert("שגיאה: " + e.message));
 }
+
 function repeatSentence(session) {
   playFlow(session, session.idx).catch(e => alert("שגיאה: " + e.message));
 }
@@ -349,35 +487,22 @@ async function playFlow(session, startIdx) {
   }
 }
 
-/* מקשי קיצור */
+// Shortcuts
 document.addEventListener("keydown", (ev) => {
   const tag = (ev.target && ev.target.tagName || "").toLowerCase();
   if (tag === "input" || tag === "textarea" || tag === "select") return;
-
   if (!activeSession) return;
 
   if ($("mode").value === "space") {
-    if (ev.code === "Space") {
-      ev.preventDefault();
-      nextSentence(activeSession);
-    }
-    if (ev.key === "r" || ev.key === "R") {
-      ev.preventDefault();
-      repeatSentence(activeSession);
-    }
-    if (ev.key === "ArrowRight") {
-      ev.preventDefault();
-      nextSentence(activeSession);
-    }
-    if (ev.key === "ArrowLeft") {
-      ev.preventDefault();
-      prevSentence(activeSession);
-    }
+    if (ev.code === "Space") { ev.preventDefault(); nextSentence(activeSession); }
+    if (ev.key === "r" || ev.key === "R") { ev.preventDefault(); repeatSentence(activeSession); }
+    if (ev.key === "ArrowRight") { ev.preventDefault(); nextSentence(activeSession); }
+    if (ev.key === "ArrowLeft") { ev.preventDefault(); prevSentence(activeSession); }
   }
 });
 
 async function summarizeInto(outEl, article, level) {
-  outEl.innerHTML = `<div class="statusLine small">מסכם…</div>`;
+  outEl.innerHTML = `<div class="small">מסכם…</div>`;
 
   const raw = `${article.title || ""}\n\n${article.description || ""}\n\n${article.content || ""}`.trim();
   const s = await apiPostJson("/api/summarize", { text: raw, level });
@@ -410,7 +535,6 @@ async function summarizeInto(outEl, article, level) {
         try {
           stopAudio();
 
-          // ניסיון להביא תרגום למילה לפי ה-session הפעיל והמשפט הנוכחי
           let he = "";
           if (activeSession) {
             const map = await ensureWordMap(activeSession, activeSession.idx);
@@ -422,7 +546,8 @@ async function summarizeInto(outEl, article, level) {
           setCurrentWordLine(w, he);
           showTipOver(sp, he);
 
-          await playWordDirect(w);
+          const blob = await fetchWordAudioBlob(w);
+          await playBlob(blob);
 
           showTipOver(null, "");
         } catch (e) {
@@ -432,7 +557,6 @@ async function summarizeInto(outEl, article, level) {
 
       hi.appendChild(sp);
       spans.push(sp);
-
       hi.appendChild(document.createTextNode(" "));
     }
 
@@ -450,6 +574,15 @@ async function summarizeInto(outEl, article, level) {
   return { sentences, hiSentenceEls, wordSpanElsBySentence, wordsBySentence };
 }
 
+// 3) Don't show already-seen articles (device-local)
+function getSeen() {
+  try { return new Set(JSON.parse(localStorage.getItem("seenUrls") || "[]")); }
+  catch { return new Set(); }
+}
+function saveSeen(set) {
+  localStorage.setItem("seenUrls", JSON.stringify([...set]));
+}
+
 async function loadNews() {
   $("status").textContent = "טוען חדשות...";
   $("list").innerHTML = "";
@@ -461,9 +594,17 @@ async function loadNews() {
   const level = $("level").value;
 
   const news = await apiGet(`/api/news?count=${encodeURIComponent(count)}&q=${encodeURIComponent(q)}`);
-  $("status").textContent = `מציג ${news.articles.length} (מתוך ${news.totalResults}).`;
 
-  for (const a of news.articles) {
+  const seen = getSeen();
+  const unique = (news.articles || []).filter(a => a?.url && !seen.has(a.url));
+  const chosen = unique.slice(0, count);
+
+  chosen.forEach(a => seen.add(a.url));
+  saveSeen(seen);
+
+  $("status").textContent = `מציג ${chosen.length} (חדשות חדשות בלבד).`;
+
+  for (const a of chosen) {
     const card = document.createElement("div");
     card.className = "card";
 
@@ -476,15 +617,8 @@ async function loadNews() {
 
     const readBtn = document.createElement("button");
     readBtn.textContent = "READ";
+    readBtn.className = "primary";
     controls.appendChild(readBtn);
-
-    const prevBtn = document.createElement("button");
-    prevBtn.textContent = "PREV";
-    controls.appendChild(prevBtn);
-
-    const nextBtn = document.createElement("button");
-    nextBtn.textContent = "NEXT";
-    controls.appendChild(nextBtn);
 
     const repeatBtn = document.createElement("button");
     repeatBtn.textContent = "REPEAT";
@@ -492,12 +626,24 @@ async function loadNews() {
 
     const stopBtn = document.createElement("button");
     stopBtn.textContent = "STOP";
+    stopBtn.className = "danger";
     controls.appendChild(stopBtn);
 
     const info = document.createElement("span");
     info.className = "small";
-    info.textContent = "";
     controls.appendChild(info);
+
+    // 4) NEXT/PREV row
+    const nav = document.createElement("div");
+    nav.className = "navRow";
+
+    const prevBtn = document.createElement("button");
+    prevBtn.textContent = "PREV";
+    nav.appendChild(prevBtn);
+
+    const nextBtn = document.createElement("button");
+    nextBtn.textContent = "NEXT";
+    nav.appendChild(nextBtn);
 
     const out = document.createElement("div");
 
@@ -512,6 +658,10 @@ async function loadNews() {
 
     card.appendChild(title);
     card.appendChild(controls);
+    card.appendChild(nav);
+    const hr = document.createElement("hr");
+    hr.className = "hr";
+    card.appendChild(hr);
     card.appendChild(out);
     card.appendChild(imgWrap);
     $("list").appendChild(card);
@@ -529,51 +679,34 @@ async function loadNews() {
 
     stopBtn.onclick = () => {
       stopAudio();
-
       if (activeSession && activeSession.readBtnEl) {
         activeSession.readBtnEl.disabled = false;
         activeSession.readBtnEl.textContent = "READ";
       }
-
       activeSession = null;
       $("wordTip").style.display = "none";
       setCurrentWordLine("", "");
     };
 
     nextBtn.onclick = () => {
-      if (!activeSession || activeSession.outEl !== out) {
-        alert("הפעל READ קודם כדי להתחיל.");
-        return;
-      }
+      if (!activeSession || activeSession.outEl !== out) return alert("הפעל READ קודם כדי להתחיל.");
       nextSentence(activeSession);
     };
 
     prevBtn.onclick = () => {
-      if (!activeSession || activeSession.outEl !== out) {
-        alert("הפעל READ קודם כדי להתחיל.");
-        return;
-      }
+      if (!activeSession || activeSession.outEl !== out) return alert("הפעל READ קודם כדי להתחיל.");
       prevSentence(activeSession);
     };
 
     repeatBtn.onclick = () => {
-      if (!activeSession || activeSession.outEl !== out) {
-        alert("הפעל READ קודם כדי להתחיל.");
-        return;
-      }
+      if (!activeSession || activeSession.outEl !== out) return alert("הפעל READ קודם כדי להתחיל.");
       repeatSentence(activeSession);
     };
 
     readBtn.onclick = async () => {
       try {
-        if (!summaryData) {
-          alert("הסיכום עדיין נטען… נסה שוב בעוד רגע.");
-          return;
-        }
-        if (!summaryData.sentences.length) {
-          alert("אין משפטים להקראה.");
-          return;
-        }
+        if (!summaryData) return alert("הסיכום עדיין נטען… נסה שוב בעוד רגע.");
+        if (!summaryData.sentences.length) return alert("אין משפטים להקראה.");
 
         stopAudio();
 
@@ -598,16 +731,14 @@ async function loadNews() {
       } catch (e) {
         alert("שגיאה: " + e.message);
       } finally {
-        if (readBtn === (activeSession && activeSession.readBtnEl)) {
-          readBtn.disabled = false;
-          readBtn.textContent = "READ";
-        } else {
-          // אם כבר החליפו session בינתיים – עדיין נוודא שהכפתור חוזר
-          readBtn.disabled = false;
-          readBtn.textContent = "READ";
-        }
+        readBtn.disabled = false;
+        readBtn.textContent = "READ";
       }
     };
+  }
+
+  if ((news.articles || []).length && chosen.length === 0) {
+    $("status").textContent = "אין חדשות חדשות להצגה (כבר ראית את כולן).";
   }
 }
 
